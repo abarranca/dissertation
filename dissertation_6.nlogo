@@ -2,16 +2,10 @@ extensions [ array ]
 
 breed [ households household ]
 breed [ cbds cbd ]
-;breed [ centralhomes centralhome ]
-;breed [ sprawlhomes sprawlhome ]
 
 ;;;;;;;;notes - need to create (1) housing market, (2) neighborhood structure, (3) district structure, (4)
 
 globals [
-;  total-centralhomes-to-make
-;  total-sprawlhomes-to-make
-;  num-centralhomes
-;  num-sprawlhomes
   owner-reps
   renter-reps
   city-dataset
@@ -138,26 +132,7 @@ to setup
   set org-radius 3
   grow-districts
   set-default-shape households "person"
-;  set total-centralhomes-to-make (round homes * (density-percentage / 100)) ; from Yust
-;  set total-sprawlhomes-to-make (round homes * (1 - (density-percentage / 100)))
   generate-cbds
-;  create-centralhomes total-centralhomes-to-make  ;;uniformly distribute rest of dems (total/(2^n))
-;  [
-;    set color blue
-;    setxy random-xcor random-ycor
-;    set shape "house"
-;  ]
-;  create-sprawlhomes total-sprawlhomes-to-make
-;  [
-;    set color red
-;    setxy random-xcor random-ycor
-;    set shape "house"
-;  ]
-;  while [ any? patches with [ count sprawlhomes-here >= 0.25 * (count sprawlhomes) / num-districts ] ] [  ;;make sure cities aren't too dense to make districts
-;    ask sprawlhomes [
-;      rt random 360 fd random 3
-;    ]
-;  ]
   create-households num-households [ setxy random-xcor random-ycor ]
   setup-patches
   setup-households
@@ -204,7 +179,6 @@ to setup-households
       ifelse hh-size > 1 [ set married? 1 ] [ set married? 1 ]
       set nearest-cbd min-one-of cbds [ distance myself ]
       set closest-cbd min-one-of cbds [ distance myself ]; in-radius 9
-;      set distance-to-cbd distance nearest-cbd
       set move-propensity-var ( random-float 1 + ( age * .0339 ) + ( age ^ 2 * -.0009 ) + ( hasChild? * -.2564 ) + ( married? * -.1655) + ( owner * -1.4814 ) + ( renter * .1180 ) + ( income * 0.00000280) ) ; propensity weights based on odds ratios from Clark 2013
       set move-propensity move-propensity-var / ( 1 + move-propensity-var )
       set joining-propensity random-float .5 + ( owner * .25 ) ; From DiPasquale and Glaeser 1999
@@ -282,15 +256,13 @@ to setup-patches
       set onMarket? TRUE
       set cost random-normal 173000 43000 ;; from Eckerd, Kim, Campbell 2019
       ;;set cost ceiling cost * 100
-      set rent mortgage-payment + mortgage-payment * rent-premium
       set down-payment cost * down-payment-rate
       set mortgage-payment (cost - down-payment) * (((interest-rate / 12) * (1 + interest-rate / 12) ^ 360) / (((1 + interest-rate / 12) ^ ( interest-rate / 12 ) - 1))) ; Amortization formula
+      set rent ( mortgage-payment + (mortgage-payment * rent-premium) )
       set owner-occupied 0
       set rental 0
       set my-owner nobody
       set my-renter nobody
-;      set closest-cbd min-one-of cbds [distance myself]
-;      set distance-cbd [ distance myself ] of closest-cbd
       set quality random-normal 50 15
     ]
     []
@@ -330,7 +302,7 @@ to choose-house
       [
         is-home? = true
         and [money] of myself >= down-payment
-        and mortgage-payment <= ([income] of myself * .3)
+        and mortgage-payment <= [income] of myself * .3
         and onMarket? = TRUE
         and my-owner = nobody
       ]
@@ -368,6 +340,7 @@ to choose-house
       set occupied? TRUE
       set onMarket? FALSE
       set my-owner households-here
+      set hh-district pcolor
     ]
 
     [
@@ -383,7 +356,7 @@ to choose-house
         set my-target-rental patches with
         [
           is-home? = true
-          and rent <= ([income] of myself * .3)
+          and rent <= [income] of myself * .3
           and onMarket? = TRUE
           and not any? turtles-here
         ]
@@ -420,69 +393,6 @@ to choose-house
     ]
   ]
 end
-
-;to choose-house
-;  ifelse any? patches with [ is-home? = true and [money] of myself >= down-payment and mortgage-payment <= ([income] of myself * .3) and onMarket? = TRUE and myOwner = nobody ]
-;  [ set my-target-house one-of patches with [ is-home? = true and [money] of myself >= down-payment and mortgage-payment <= ([income] of myself * .3) and onMarket? = TRUE and myOwner = nobody ] ;; took out not any? turtles-here
-;  set closest-target min-one-of my-target-house [ distance [job-location] of myself ]
-;  set quality-target max-one-of my-target-house [ quality ]
-;  set cheapest-target min-one-of my-target-house [ cost ]
-;  if preference-p-q-d = "price" [ set myHome cheapest-target set money money - down-payment ]
-;  if preference-p-q-d = "distance" [ set myHome closest-target set money money - down-payment ]
-;    if preference-p-q-d = "quality" [ set myHome quality-target set money money - down-payment ]
-;;  [
-;;    ifelse preference-p-q-d = "quality" [ set myHome quality-target set money money - down-payment ]
-;;    [
-;;      set myHome closest-target set money money - down-payment
-;;    ]
-;;  ]
-;  set onMarket? FALSE
-;    set owner 1
-;    set renter 0
-;  ]
-;  [
-;  ifelse my-target-house = no-patches [
-;    set my-target-rental ( patches with [ is-home? = true and rent <= ([income] of myself * .3) and onMarket? = TRUE and not any? turtles-here])
-;  set closest-rental-target min-one-of my-target-rental [ distance [job-location] of myself ]
-;  set quality-rental-target max-one-of my-target-rental [ quality ]
-;  set cheapest-rental-target min-one-of my-target-rental [ cost ]
-;  if preference-p-q-d = "price" [ set myRental cheapest-rental-target ]
-;  if preference-p-q-d = "distance" [ set myRental closest-rental-target ]
-;  if preference-p-q-d = "quality" [ set myRental quality-rental-target ]
-;;  [
-;;    ifelse preference-p-q-d = "quality" [ set myRental quality-target ]
-;;    [
-;;      set myRental closest-target
-;;    ]
-;;  ]
-;    set onMarket? FALSE
-;    set owner 0
-;    set renter 1
-;  ]
-;    [if my-target-house = no-patches and my-target-rental = no-patches [
-;    set number-displaced number-displaced + 1
-;      die ]
-;    ]
-;  ]
-;  set hh-district pcolor
-;end
-
-;to designate-owner-renter
-;  ifelse myHome = nobody or myHome = 0 [ set owner 0 ] [ set owner 1 ]
-;  ifelse myRental = nobody or myHome = 0 [ set renter 0 ] [ set renter 1 ]
-;end
-
-;to go-home
-;  ask households [
-;    ifelse my-home != nobody
-;    [ move-to my-home ]
-;    [ ifelse myRental != nobody
-;      [ move-to myRental ]
-;      []
-;    ]
-;    set mydistrict pcolor
-;  ]
-;end
 
 to put-house-on-market
   ask households
@@ -654,7 +564,3 @@ to do-plots
   ;set-current-plot-pen "neighborhood-ban-vote"
   ;plot sum neighborhood-ban-vote
 end
-
-
-;; ADD: tick death counter
-;; then you can run sensitivity analysis
